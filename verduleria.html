@@ -3,41 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Control Verdulería - Entregas</title>
+    <title>Control Verdulería</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-100 p-4 font-sans text-slate-900">
     <div class="max-w-xl mx-auto space-y-6">
-        
-        <div class="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm">
-            <a href="index.html" class="text-blue-600 font-bold text-sm hover:text-blue-800 transition">← Volver a Horas</a>
-            <h1 class="text-xl font-black text-blue-600 tracking-tight">VERDULERÍA</h1>
+        <div class="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+            <a href="index.html" class="text-blue-600 font-bold text-sm">← Volver</a>
+            <h1 class="text-xl font-black text-blue-600 tracking-tight text-center">VERDULERÍA</h1>
         </div>
 
         <div class="bg-white p-6 rounded-2xl shadow-md border border-slate-200">
             <form id="verduleriaForm" class="space-y-4">
-                <div>
-                    <label class="text-[10px] font-bold text-slate-400 uppercase ml-2 tracking-widest">Nombre del Personal</label>
-                    <input type="text" id="nombreVerduleria" class="w-full border-2 border-slate-100 p-3 rounded-xl uppercase outline-none focus:border-blue-400 transition" placeholder="NOMBRE COMPLETO" required>
-                </div>
-                <div>
-                    <label class="text-[10px] font-bold text-slate-400 uppercase ml-2 tracking-widest">Horas Trabajadas</label>
-                    <input type="number" id="horasV" step="0.5" class="w-full border-2 border-slate-100 p-3 rounded-xl outline-none focus:border-blue-400 transition" placeholder="0.0" required>
-                </div>
-                <button type="submit" class="w-full bg-blue-600 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-blue-700 transition transform active:scale-95">
-                    REGISTRAR HORAS
-                </button>
+                <input type="text" id="nombreV" class="w-full border-2 border-slate-100 p-3 rounded-xl uppercase outline-none focus:border-blue-400" placeholder="NOMBRE PERSONAL" required>
+                <input type="number" id="horasV" step="0.5" class="w-full border-2 border-slate-100 p-3 rounded-xl outline-none" placeholder="Horas laboradas" required>
+                <button type="submit" id="btnV" class="w-full bg-blue-600 text-white py-4 rounded-xl font-bold shadow-lg">Registrar Horas</button>
             </form>
         </div>
 
         <div class="bg-white p-6 rounded-2xl shadow-md border border-slate-200">
             <div class="flex justify-between items-center mb-4 border-b pb-2">
                 <h2 class="text-lg font-bold text-slate-700">Historial Verdulería</h2>
-                <button id="btnLimpiarVerduleria" class="text-[10px] bg-red-50 text-red-500 px-3 py-1 rounded-full font-bold border border-red-100 uppercase hover:bg-red-500 hover:text-white transition">Borrar Historial</button>
+                <button id="btnLimpiarV" class="text-[10px] bg-red-50 text-red-500 px-3 py-1 rounded-full font-bold border border-red-100 uppercase">Reiniciar</button>
             </div>
-            
-            <div id="contenedorVerduleria" class="space-y-3">
-                <p class="text-center text-slate-400 text-sm italic py-4 animate-pulse">Cargando datos...</p>
+            <div id="contenedorV" class="space-y-3"></div>
+            <div id="totalGlobalV" class="mt-6 p-4 bg-blue-600 rounded-xl text-white text-center shadow-lg hidden">
+                <p class="text-[10px] uppercase font-bold opacity-80 tracking-widest text-white">Pago Total Verdulería</p>
+                <p id="montoGlobalV" class="text-2xl font-black font-mono text-white">₡0</p>
             </div>
         </div>
     </div>
@@ -57,104 +49,56 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
-        const PRECIO_HORA = 1600;
+        const PRECIO_V = 1600;
 
         document.getElementById('verduleriaForm').onsubmit = async (e) => {
-            const btn = e.target.querySelector('button');
-            btn.disabled = true;
-            btn.innerText = "GUARDANDO...";
-            
             e.preventDefault();
+            const btn = document.getElementById('btnV');
+            btn.disabled = true; btn.innerText = "Guardando...";
             const hoy = new Date().toLocaleDateString();
-            const nombre = document.getElementById('nombreVerduleria').value.trim().toUpperCase();
+            const nombre = document.getElementById('nombreV').value.trim().toUpperCase();
             const horas = parseFloat(document.getElementById('horasV').value) || 0;
-            
             try {
-                await addDoc(collection(db, "jornadas"), { 
-                    tipo: 'verduleria', 
-                    empleado: nombre, 
-                    fecha: hoy, 
-                    horas: horas, 
-                    precioHora: PRECIO_HORA,
-                    createdAt: new Date()
-                });
-                e.target.reset();
-                cargarVerduleria();
-            } catch (err) {
-                alert("Error al guardar");
-            } finally {
-                btn.disabled = false;
-                btn.innerText = "REGISTRAR HORAS";
-            }
+                await addDoc(collection(db, "jornadas"), { tipo: 'verduleria', empleado: nombre, fecha: hoy, horas: horas, precioHora: PRECIO_V, createdAt: new Date() });
+                e.target.reset(); cargarV();
+            } catch (err) { alert("Error"); } finally { btn.disabled = false; btn.innerText = "Registrar Horas"; }
         };
 
-        window.eliminarRegistroV = async (id) => {
-            if(confirm("¿Eliminar este registro de verdulería?")) {
-                await deleteDoc(doc(db, "jornadas", id));
-                cargarVerduleria();
-            }
+        window.eliminarV = async (id) => {
+            if(confirm("¿Eliminar registro?")) { await deleteDoc(doc(db, "jornadas", id)); cargarV(); }
         };
 
-        async function cargarVerduleria() {
-            const lista = document.getElementById('contenedorVerduleria');
-            // Filtramos por tipo 'verduleria'
+        async function cargarV() {
+            const lista = document.getElementById('contenedorV');
             const q = query(collection(db, "jornadas"), where("tipo", "==", "verduleria"), orderBy("createdAt", "desc"));
             const snap = await getDocs(q);
-            
-            lista.innerHTML = "";
-            
-            if (snap.empty) {
-                lista.innerHTML = "<p class='text-center text-slate-400 text-sm italic py-4'>No hay registros en verdulería.</p>";
-                return;
-            }
-
+            let globalV = 0; lista.innerHTML = "";
+            if (snap.empty) { document.getElementById('totalGlobalV').classList.add('hidden'); lista.innerHTML = "<p class='text-center text-slate-400 text-sm italic'>Sin registros.</p>"; return; }
             snap.forEach(documento => {
-                const d = documento.data();
-                const id = documento.id;
-                const total = (d.horas || 0) * (d.precioHora || 1600);
-
+                const d = documento.data(); const id = documento.id;
+                const sub = (d.horas || 0) * PRECIO_V; globalV += sub;
                 const div = document.createElement('div');
                 div.className = "p-4 bg-white border border-slate-100 rounded-xl shadow-sm flex flex-col gap-3";
                 div.innerHTML = `
-                    <div class="flex justify-between items-center">
-                        <div>
-                            <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">${d.fecha}</p>
-                            <p class="font-black text-slate-800 uppercase text-sm">${d.empleado}</p>
-                        </div>
-                        <button onclick="eliminarRegistroV('${id}')" class="text-slate-300 hover:text-red-500 transition text-lg">✕</button>
-                    </div>
-
+                    <div class="flex justify-between items-center"><div><p class="text-[9px] text-slate-400 font-bold uppercase">${d.fecha}</p><p class="font-black text-slate-800 uppercase text-sm">${d.empleado}</p></div><button onclick="eliminarV('${id}')" class="text-slate-300 hover:text-red-500">✕</button></div>
                     <div class="flex items-center justify-between bg-slate-50 p-3 rounded-lg border border-slate-100">
-                        <div class="text-center">
-                            <p class="text-[9px] font-bold text-slate-400 uppercase">Horas</p>
-                            <p class="text-lg font-black text-blue-600 font-mono">${d.horas}</p>
-                        </div>
-                        <div class="text-center">
-                            <p class="text-[9px] font-bold text-slate-400 uppercase italic">Precio Hora</p>
-                            <p class="text-sm font-bold text-slate-700">$${d.precioHora}</p>
-                        </div>
-                        <div class="text-right">
-                            <p class="text-[9px] font-bold text-slate-400 uppercase">Subtotal</p>
-                            <p class="text-md font-black text-green-600 font-mono">$${total.toLocaleString()}</p>
-                        </div>
-                    </div>
-                `;
+                        <div class="text-center"><p class="text-[9px] text-slate-400 uppercase tracking-tighter">Horas</p><p class="text-lg font-black text-blue-600 font-mono">${d.horas}</p></div>
+                        <div class="text-center"><p class="text-[9px] text-slate-400 uppercase tracking-tighter">Precio H.</p><p class="text-sm font-bold text-slate-600">₡1.600</p></div>
+                        <div class="text-right"><p class="text-[9px] text-slate-400 uppercase tracking-tighter">Subtotal</p><p class="text-md font-black text-green-600 font-mono">₡${sub.toLocaleString('es-CR')}</p></div>
+                    </div>`;
                 lista.appendChild(div);
             });
+            document.getElementById('totalGlobalV').classList.remove('hidden');
+            document.getElementById('montoGlobalV').innerText = "₡" + globalV.toLocaleString('es-CR');
         }
-
-        document.getElementById('btnLimpiarVerduleria').onclick = async () => {
-            if(confirm("¿Borrar todo el historial de verdulería?")) {
+        document.getElementById('btnLimpiarV').onclick = async () => {
+            if(confirm("¿Borrar historial verduleria?")) {
                 const q = query(collection(db, "jornadas"), where("tipo", "==", "verduleria"));
                 const snap = await getDocs(q);
-                const batch = writeBatch(db);
-                snap.forEach(d => batch.delete(d.ref));
-                await batch.commit();
-                cargarVerduleria();
+                const batch = writeBatch(db); snap.forEach(d => batch.delete(d.ref)); await batch.commit(); cargarV();
             }
         };
-
-        cargarVerduleria();
+        cargarV();
     </script>
 </body>
 </html>
