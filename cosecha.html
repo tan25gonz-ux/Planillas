@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control de Cosecha - Entregas</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 p-4 font-sans text-slate-900">
+    <div class="max-w-xl mx-auto space-y-6">
+        
+        <div class="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm">
+            <a href="index.html" class="text-blue-600 font-bold text-sm hover:text-blue-800 transition">← Volver a Horas</a>
+            <h1 class="text-xl font-black text-blue-600 tracking-tight">COSECHA</h1>
+        </div>
+
+        <div class="bg-white p-6 rounded-2xl shadow-md border border-slate-200">
+            <form id="cosechaForm" class="space-y-4">
+                <div>
+                    <label class="text-[10px] font-bold text-slate-400 uppercase ml-2 tracking-widest">Empleado que entrega</label>
+                    <input type="text" id="nombreCosecha" class="w-full border-2 border-slate-100 p-3 rounded-xl uppercase outline-none focus:border-blue-400 transition" placeholder="NOMBRE COMPLETO" required>
+                </div>
+                <div>
+                    <label class="text-[10px] font-bold text-slate-400 uppercase ml-2 tracking-widest">Cantidad de Cajas</label>
+                    <input type="number" id="cajas" class="w-full border-2 border-slate-100 p-3 rounded-xl outline-none focus:border-blue-400 transition" placeholder="0" required>
+                </div>
+                <button type="submit" class="w-full bg-blue-600 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-blue-700 transition transform active:scale-95">
+                    REGISTRAR ENTREGA
+                </button>
+            </form>
+        </div>
+
+        <div class="bg-white p-6 rounded-2xl shadow-md border border-slate-200">
+            <div class="flex justify-between items-center mb-4 border-b pb-2">
+                <h2 class="text-lg font-bold text-slate-700">Historial de Entregas</h2>
+                <button id="btnLimpiarCosecha" class="text-[10px] bg-red-50 text-red-500 px-3 py-1 rounded-full font-bold border border-red-100 uppercase hover:bg-red-500 hover:text-white transition">Borrar Historial</button>
+            </div>
+            
+            <div id="contenedorCosecha" class="space-y-3">
+                <p class="text-center text-slate-400 text-sm italic py-4 animate-pulse">Cargando entregas...</p>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, query, where, getDocs, addDoc, updateDoc, doc, writeBatch, orderBy, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDyMOLpJEBba4cS6IKMXhQthHjx-e4A8_c",
+            authDomain: "maii-57e2e.firebaseapp.com",
+            projectId: "maii-57e2e",
+            storageBucket: "maii-57e2e.firebasestorage.app",
+            messagingSenderId: "206886816498",
+            appId: "1:206886816498:web:93b853d5924e3789b51e6b"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        document.getElementById('cosechaForm').onsubmit = async (e) => {
+            const btn = e.target.querySelector('button');
+            btn.disabled = true;
+            btn.innerText = "GUARDANDO...";
+            
+            e.preventDefault();
+            const hoy = new Date().toLocaleDateString();
+            const nombre = document.getElementById('nombreCosecha').value.trim().toUpperCase();
+            const cajas = parseFloat(document.getElementById('cajas').value) || 0;
+            
+            try {
+                await addDoc(collection(db, "jornadas"), { 
+                    tipo: 'cosecha', 
+                    empleado: nombre, 
+                    fecha: hoy, 
+                    cajas: cajas, 
+                    precioCaja: 0,
+                    createdAt: new Date()
+                });
+                e.target.reset();
+                cargarCosecha();
+            } catch (err) {
+                alert("Error al guardar");
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "REGISTRAR ENTREGA";
+            }
+        };
+
+        window.actualizarPrecioIndividual = async (id, precio) => {
+            await updateDoc(doc(db, "jornadas", id), { precioCaja: parseFloat(precio) || 0 });
+            cargarCosecha();
+        };
+
+        window.eliminarEntrega = async (id) => {
+            if(confirm("¿Eliminar este registro de cosecha?")) {
+                await deleteDoc(doc(db, "jornadas", id));
+                cargarCosecha();
+            }
+        };
+
+        async function cargarCosecha() {
+            const lista = document.getElementById('contenedorCosecha');
+            const q = query(collection(db, "jornadas"), where("tipo", "==", "cosecha"), orderBy("createdAt", "desc"));
+            const snap = await getDocs(q);
+            
+            lista.innerHTML = "";
+            
+            if (snap.empty) {
+                lista.innerHTML = "<p class='text-center text-slate-400 text-sm italic py-4'>No hay entregas registradas.</p>";
+                return;
+            }
+
+            snap.forEach(documento => {
+                const d = documento.data();
+                const id = documento.id;
+                const total = d.cajas * (d.precioCaja || 0);
+
+                const div = document.createElement('div');
+                div.className = "p-4 bg-white border border-slate-100 rounded-xl shadow-sm flex flex-col gap-3 transition hover:border-blue-100";
+                div.innerHTML = `
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">${d.fecha}</p>
+                            <p class="font-black text-slate-800 uppercase text-sm">${d.empleado}</p>
+                        </div>
+                        <button onclick="eliminarEntrega('${id}')" class="text-slate-300 hover:text-red-500 transition text-lg">✕</button>
+                    </div>
+
+                    <div class="flex items-center justify-between bg-slate-50 p-3 rounded-lg border border-slate-100">
+                        <div class="text-center">
+                            <p class="text-[9px] font-bold text-slate-400 uppercase">Cajas</p>
+                            <p class="text-lg font-black text-blue-600 font-mono">${d.cajas}</p>
+                        </div>
+                        <div class="flex flex-col items-center">
+                            <p class="text-[9px] font-bold text-slate-400 uppercase italic">Precio</p>
+                            <div class="flex items-center gap-1">
+                                <span class="text-blue-600 font-bold text-xs">$</span>
+                                <input type="number" value="${d.precioCaja || 0}" 
+                                    onchange="actualizarPrecioIndividual('${id}', this.value)"
+                                    class="w-20 bg-white border border-slate-200 rounded-md text-center font-bold text-slate-800 text-sm outline-none focus:ring-2 focus:ring-blue-400 transition">
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-[9px] font-bold text-slate-400 uppercase">Subtotal</p>
+                            <p class="text-md font-black text-green-600 font-mono">$${total.toLocaleString()}</p>
+                        </div>
+                    </div>
+                `;
+                lista.appendChild(div);
+            });
+        }
+
+        document.getElementById('btnLimpiarCosecha').onclick = async () => {
+            if(confirm("¿Seguro que quieres borrar todas las entregas de cosecha?")) {
+                const q = query(collection(db, "jornadas"), where("tipo", "==", "cosecha"));
+                const snap = await getDocs(q);
+                const batch = writeBatch(db);
+                snap.forEach(d => batch.delete(d.ref));
+                await batch.commit();
+                cargarCosecha();
+            }
+        };
+
+            cargarCosecha();
+    </script>
+</body>
+</html>
