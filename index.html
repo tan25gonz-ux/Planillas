@@ -12,11 +12,12 @@
 </head>
 <body class="bg-slate-100 p-4 font-sans text-slate-900">
     <div class="max-w-xl mx-auto space-y-6">
-        
         <div class="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm">
             <h1 class="text-xl font-black text-blue-600 tracking-tight">PLANILLA HORAS</h1>
-            <a href="cosecha.html" class="bg-emerald-100 text-emerald-700 font-bold text-xs px-4 py-2 rounded-lg hover:bg-emerald-200 transition">Ir a Cosecha →</a>
-            <a href="verduleria.html" class="bg-emerald-100 text-emerald-700 font-bold text-xs px-4 py-2 rounded-lg hover:bg-emerald-200 transition">Ir a verduleria →</a>
+            <div class="flex gap-2">
+                <a href="cosecha.html" class="bg-blue-50 text-blue-700 font-bold text-[10px] px-3 py-2 rounded-lg">Cosecha</a>
+                <a href="verduleria.html" class="bg-blue-50 text-blue-700 font-bold text-[10px] px-3 py-2 rounded-lg">Verduleria</a>
+            </div>
         </div>
 
         <div class="bg-white p-6 rounded-2xl shadow-md border border-slate-200">
@@ -24,11 +25,11 @@
                 <input type="text" id="nombreEmpleado" class="w-full border-2 border-slate-100 p-3 rounded-xl uppercase outline-none focus:border-blue-400" placeholder="Nombre Empleado" required>
                 <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <label class="text-[10px] font-bold text-gray-400 uppercase ml-2 tracking-widest">Normales</label>
+                        <label class="text-[10px] font-bold text-gray-400 uppercase ml-2">Normales (₡1.600)</label>
                         <input type="number" id="horas" step="0.5" class="w-full border-2 border-slate-100 p-3 rounded-xl outline-none" placeholder="0">
                     </div>
                     <div>
-                        <label class="text-[10px] font-bold text-gray-400 uppercase ml-2 tracking-widest">Extras</label>
+                        <label class="text-[10px] font-bold text-gray-400 uppercase ml-2">Extras (₡2.000)</label>
                         <input type="number" id="horasExtra" step="0.5" class="w-full border-2 border-slate-100 p-3 rounded-xl outline-none" placeholder="0">
                     </div>
                 </div>
@@ -39,10 +40,12 @@
         <div class="bg-white p-6 rounded-2xl shadow-md border border-slate-200">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-lg font-bold text-slate-800">Cuentas Semanales</h2>
-                <button id="btnBorrarHoras" class="text-[10px] bg-red-50 text-red-500 px-3 py-1 rounded-full font-bold border border-red-100 hover:bg-red-500 hover:text-white transition">REINICIAR PLANILLA</button>
+                <button id="btnBorrarHoras" class="text-[10px] bg-red-50 text-red-500 px-3 py-1 rounded-full font-bold border border-red-100 uppercase">Reiniciar</button>
             </div>
-            <div id="contenedorCuentas" class="space-y-4">
-                <p class="text-center text-slate-400 text-sm italic">Esperando datos nuevos...</p>
+            <div id="contenedorCuentas" class="space-y-4"></div>
+            <div id="totalGlobalPlanilla" class="mt-6 p-4 bg-blue-600 rounded-xl text-white text-center shadow-lg hidden">
+                <p class="text-[10px] uppercase font-bold opacity-80 tracking-widest">Total Global a Pagar</p>
+                <p id="montoGlobalPlanilla" class="text-2xl font-black font-mono">₡0</p>
             </div>
         </div>
     </div>
@@ -68,58 +71,30 @@
         document.getElementById('registroForm').onsubmit = async (e) => {
             e.preventDefault();
             const btn = document.getElementById('btnGuardar');
-            btn.disabled = true;
-            btn.innerText = "Guardando...";
-
+            btn.disabled = true; btn.innerText = "Guardando...";
             const hoy = new Date().toISOString().split('T')[0];
             const nombre = document.getElementById('nombreEmpleado').value.trim().toUpperCase();
             const hN = parseFloat(document.getElementById('horas').value) || 0;
             const hE = parseFloat(document.getElementById('horasExtra').value) || 0;
-
             try {
-                // Buscamos si existe registro de tipo 'hora' para hoy
-                const q = query(collection(db, "jornadas"), 
-                          where("empleado", "==", nombre), 
-                          where("fecha", "==", hoy), 
-                          where("tipo", "==", "hora"));
-                
+                const q = query(collection(db, "jornadas"), where("empleado", "==", nombre), where("fecha", "==", hoy), where("tipo", "==", "hora"));
                 const snap = await getDocs(q);
-
                 if (!snap.empty) {
                     const docId = snap.docs[0].id;
-                    const dataExistente = snap.docs[0].data();
-                    await updateDoc(doc(db, "jornadas", docId), { 
-                        hN: (dataExistente.hN || 0) + hN,
-                        hE: (dataExistente.hE || 0) + hE
-                    });
+                    const data = snap.docs[0].data();
+                    await updateDoc(doc(db, "jornadas", docId), { hN: (data.hN || 0) + hN, hE: (data.hE || 0) + hE });
                 } else {
-                    await addDoc(collection(db, "jornadas"), { 
-                        tipo: 'hora', 
-                        empleado: nombre, 
-                        fecha: hoy, 
-                        hN: hN, 
-                        hE: hE,
-                        createdAt: new Date()
-                    });
+                    await addDoc(collection(db, "jornadas"), { tipo: 'hora', empleado: nombre, fecha: hoy, hN, hE, createdAt: new Date() });
                 }
-                e.target.reset();
-                await cargarDatos();
-            } catch (err) {
-                console.error(err);
-                alert("Error al guardar datos");
-            } finally {
-                btn.disabled = false;
-                btn.innerText = "Guardar Registro";
-            }
+                e.target.reset(); await cargarDatos();
+            } catch (err) { alert("Error"); } finally { btn.disabled = false; btn.innerText = "Guardar Registro"; }
         };
 
         async function cargarDatos() {
             const contenedor = document.getElementById('contenedorCuentas');
-            // Solo cargamos los que tienen tipo 'hora'
             const q = query(collection(db, "jornadas"), where("tipo", "==", "hora"));
             const snapshot = await getDocs(q);
-            
-            let resumen = {};
+            let resumen = {}; let globalTotal = 0;
             snapshot.forEach(doc => {
                 const d = doc.data();
                 if(!resumen[d.empleado]) resumen[d.empleado] = { hN: 0, hE: 0, historial: [] };
@@ -127,59 +102,41 @@
                 resumen[d.empleado].hE += (parseFloat(d.hE) || 0);
                 resumen[d.empleado].historial.push(d);
             });
-
             contenedor.innerHTML = "";
             const nombres = Object.keys(resumen);
-
             if (nombres.length === 0) {
-                contenedor.innerHTML = "<p class='text-center text-slate-400 text-sm italic'>No hay horas registradas esta semana.</p>";
+                document.getElementById('totalGlobalPlanilla').classList.add('hidden');
+                contenedor.innerHTML = "<p class='text-center text-slate-400 text-sm italic'>Sin registros.</p>";
                 return;
             }
-
             nombres.forEach(nombre => {
                 const info = resumen[nombre];
                 const total = (info.hN * PRECIO_NORMAL) + (info.hE * PRECIO_EXTRA);
-                
+                globalTotal += total;
                 const item = document.createElement('details');
                 item.className = "group border-2 border-slate-50 rounded-2xl bg-white shadow-sm overflow-hidden mb-3";
                 item.innerHTML = `
                     <summary class="p-4 flex justify-between items-center hover:bg-slate-50 transition">
-                        <div>
-                            <p class="text-sm font-bold uppercase text-slate-700">${nombre} ▾</p>
-                            <p class="text-[10px] text-slate-400">${info.hN}n / ${info.hE}x</p>
-                        </div>
-                        <div class="text-right">
-                            <p class="text-lg font-black text-blue-600 font-mono leading-none">$${total.toLocaleString()}</p>
-                            <p class="text-[9px] text-slate-400 mt-1 uppercase tracking-tighter font-bold">A Pagar</p>
-                        </div>
+                        <div><p class="text-sm font-bold uppercase text-slate-700">${nombre} ▾</p></div>
+                        <div class="text-right"><p class="text-lg font-black text-blue-600 font-mono">₡${total.toLocaleString('es-CR')}</p></div>
                     </summary>
-                    <div class="p-4 bg-slate-50 border-t border-slate-100">
-                        <p class="text-[9px] font-bold text-slate-400 uppercase mb-2 tracking-widest">Días Trabajados:</p>
-                        <div class="space-y-1">
-                            ${info.historial.sort((a,b) => a.fecha.localeCompare(b.fecha)).map(h => `
-                                <div class="flex justify-between text-[11px] bg-white p-2 rounded-lg border border-slate-100">
-                                    <span class="font-medium text-slate-500">${h.fecha || 'Sin fecha'}</span>
-                                    <span class="font-bold text-slate-700">${h.hN || 0}n + ${h.hE || 0}x</span>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                `;
+                    <div class="p-4 bg-slate-50 border-t border-slate-100 space-y-1">
+                        ${info.historial.map(h => `<div class="flex justify-between text-[11px] p-2 bg-white rounded-lg border border-slate-100"><span>${h.fecha}</span><span>${h.hN}n + ${h.hE}x</span></div>`).join('')}
+                    </div>`;
                 contenedor.appendChild(item);
             });
+            document.getElementById('totalGlobalPlanilla').classList.remove('hidden');
+            document.getElementById('montoGlobalPlanilla').innerText = "₡" + globalTotal.toLocaleString('es-CR');
         }
-
         document.getElementById('btnBorrarHoras').onclick = async () => {
-            if(confirm("¿Borrar planilla de horas? La cosecha no se tocará.")) {
+            if(confirm("¿Borrar planilla?")) {
                 const q = query(collection(db, "jornadas"), where("tipo", "==", "hora"));
                 const snap = await getDocs(q);
                 const batch = writeBatch(db);
                 snap.forEach(d => batch.delete(d.ref));
-                await batch.commit();
-                cargarDatos();
+                await batch.commit(); cargarDatos();
             }
         };
-
         cargarDatos();
     </script>
 </body>
