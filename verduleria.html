@@ -3,12 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Control Verdulería - Acumulado</title>
+    <title>Control Verdulería - Suma Total</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        summary { cursor: pointer; list-style: none; }
-        summary::-webkit-details-marker { display: none; }
-    </style>
 </head>
 <body class="bg-slate-100 p-4 font-sans text-slate-900">
     <div class="max-w-xl mx-auto space-y-6">
@@ -21,30 +17,30 @@
             <form id="verduleriaForm" class="space-y-4">
                 <div>
                     <label class="text-[10px] font-bold text-slate-400 uppercase ml-2 tracking-widest">Nombre Personal</label>
-                    <input type="text" id="nombreV" class="w-full border-2 border-slate-100 p-3 rounded-xl uppercase outline-none focus:border-blue-400" placeholder="EJ: ANGIE o TAN" required>
+                    <input type="text" id="nombreV" class="w-full border-2 border-slate-100 p-3 rounded-xl uppercase outline-none focus:border-blue-400" placeholder="ANGIE, TAN, ROXANA..." required>
                 </div>
                 <div>
                     <label class="text-[10px] font-bold text-slate-400 uppercase ml-2 tracking-widest">Horas a sumar</label>
                     <input type="number" id="horasV" step="0.5" class="w-full border-2 border-slate-100 p-3 rounded-xl outline-none" placeholder="0.0" required>
                 </div>
                 <button type="submit" id="btnV" class="w-full bg-blue-600 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-blue-700 transition">
-                    SUMAR AL TOTAL SEMANAL
+                    SUMAR HORAS AL NOMBRE
                 </button>
             </form>
         </div>
 
         <div class="bg-white p-6 rounded-2xl shadow-md border border-slate-200">
             <div class="flex justify-between items-center mb-4 border-b pb-2">
-                <h2 class="text-lg font-bold text-slate-700">Totales de la Semana</h2>
+                <h2 class="text-lg font-bold text-slate-700">Totales Semanales</h2>
                 <button id="btnLimpiarV" class="text-[10px] bg-red-50 text-red-500 px-3 py-1 rounded-full font-bold border border-red-100 uppercase">Reiniciar Semana</button>
             </div>
             
-            <div id="contenedorV" class="space-y-4">
-                <p class="text-center text-slate-400 text-sm italic">Cargando datos...</p>
+            <div id="contenedorV" class="space-y-3">
+                <p class="text-center text-slate-400 text-sm">Cargando...</p>
             </div>
 
-            <div id="totalGlobalV" class="mt-6 p-4 bg-blue-700 rounded-xl text-white text-center shadow-lg hidden">
-                <p class="text-[10px] uppercase font-bold opacity-80 tracking-widest">Monto Total Planilla</p>
+            <div id="totalGlobalV" class="mt-6 p-4 bg-blue-600 rounded-xl text-white text-center shadow-lg hidden">
+                <p class="text-[10px] uppercase font-bold opacity-80 tracking-widest">Total Planilla Verdulería</p>
                 <p id="montoGlobalV" class="text-2xl font-black font-mono">₡0</p>
             </div>
         </div>
@@ -52,7 +48,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, collection, query, where, getDocs, addDoc, updateDoc, doc, writeBatch, orderBy, deleteDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, collection, query, where, getDocs, addDoc, updateDoc, doc, writeBatch, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyDyMOLpJEBba4cS6IKMXhQthHjx-e4A8_c",
@@ -66,112 +62,104 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
-        // Función para determinar el precio por hora según el nombre
-        const obtenerPrecioHora = (nombre) => (nombre.includes("ANGIE")) ? 1400 : 1600;
+        // LÓGICA DE PRECIOS
+        const obtenerPrecio = (n) => n.includes("ANGIE") ? 1400 : 1600;
 
         document.getElementById('verduleriaForm').onsubmit = async (e) => {
             e.preventDefault();
             const btn = document.getElementById('btnV');
-            btn.disabled = true;
-            
-            const hoy = new Date().toLocaleDateString('es-CR');
             const nombre = document.getElementById('nombreV').value.trim().toUpperCase();
-            const nuevasHoras = parseFloat(document.getElementById('horasV').value) || 0;
+            const horasNuevas = parseFloat(document.getElementById('horasV').value) || 0;
+            
+            btn.disabled = true;
+            btn.innerText = "BUSCANDO NOMBRE...";
 
             try {
-                // Buscamos si el empleado ya existe en la lista actual
+                // Buscamos si el nombre YA existe en la base de datos
                 const q = query(collection(db, "jornadas"), 
-                          where("empleado", "==", nombre), 
-                          where("tipo", "==", "verduleria"));
+                                where("tipo", "==", "verduleria"), 
+                                where("empleado", "==", nombre));
                 
                 const snap = await getDocs(q);
 
                 if (!snap.empty) {
-                    // Si existe, actualizamos el mismo documento (Suma las horas)
-                    const docId = snap.docs[0].id;
-                    const horasActuales = parseFloat(snap.docs[0].data().horas) || 0;
-                    
-                    await updateDoc(doc(db, "jornadas", docId), { 
-                        horas: horasActuales + nuevasHoras,
-                        historial: arrayUnion({ fecha: hoy, cant: nuevasHoras })
-                    });
+                    // SI EXISTE: Tomamos el primer documento que encuentre y le SUMAMOS
+                    const docRef = doc(db, "jornadas", snap.docs[0].id);
+                    const horasViejas = parseFloat(snap.docs[0].data().horas) || 0;
+                    await updateDoc(docRef, { horas: horasViejas + horasNuevas });
                 } else {
-                    // Si no existe, creamos uno nuevo
-                    await addDoc(collection(db, "jornadas"), { 
-                        tipo: 'verduleria', 
-                        empleado: nombre, 
-                        horas: nuevasHoras,
-                        historial: [{ fecha: hoy, cant: nuevasHoras }],
-                        createdAt: new Date() 
+                    // SI NO EXISTE: Lo creamos desde cero
+                    await addDoc(collection(db, "jornadas"), {
+                        tipo: "verduleria",
+                        empleado: nombre,
+                        horas: horasNuevas,
+                        timestamp: Date.now()
                     });
                 }
-                e.target.reset(); 
+                e.target.reset();
                 cargarV();
-            } catch (err) { 
-                console.error(err); 
-            } finally { 
-                btn.disabled = false; 
+            } catch (error) {
+                console.error(error);
+                alert("Error al guardar");
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "SUMAR HORAS AL NOMBRE";
             }
         };
 
         window.eliminarV = async (id) => {
-            if(confirm("¿Eliminar este registro?")) { await deleteDoc(doc(db, "jornadas", id)); cargarV(); }
+            if(confirm("¿Eliminar este nombre?")) { 
+                await deleteDoc(doc(db, "jornadas", id)); 
+                cargarV(); 
+            }
         };
 
         async function cargarV() {
             const lista = document.getElementById('contenedorV');
-            const q = query(collection(db, "jornadas"), where("tipo", "==", "verduleria"), orderBy("createdAt", "desc"));
+            const q = query(collection(db, "jornadas"), where("tipo", "==", "verduleria"));
             const snap = await getDocs(q);
-            let globalSuma = 0; 
-            
-            if (snap.empty) { 
-                document.getElementById('totalGlobalV').classList.add('hidden'); 
-                lista.innerHTML = "<p class='text-slate-400 text-center py-4'>No hay datos registrados.</p>"; 
-                return; 
+            let totalGeneral = 0;
+
+            if (snap.empty) {
+                lista.innerHTML = "<p class='text-slate-400 text-center'>No hay empleados en la lista.</p>";
+                document.getElementById('totalGlobalV').classList.add('hidden');
+                return;
             }
 
             lista.innerHTML = "";
-            snap.forEach(documento => {
-                const d = documento.data();
-                const precio = obtenerPrecioHora(d.empleado);
-                const totalPersona = d.horas * precio;
-                globalSuma += totalPersona;
-                
-                const item = document.createElement('details');
-                item.className = "group border border-slate-200 rounded-xl bg-white overflow-hidden shadow-sm";
-                item.innerHTML = `
-                    <summary class="p-4 flex justify-between items-center hover:bg-slate-50">
-                        <div>
-                            <p class="text-sm font-black text-slate-700">${d.empleado} <span class="text-[10px] text-slate-400 font-normal">▾</span></p>
-                            <p class="text-[11px] font-bold text-blue-600">${d.horas}h totales (@ ₡${precio})</p>
-                        </div>
-                        <div class="flex items-center gap-4">
-                            <p class="text-lg font-mono font-bold text-green-600">₡${totalPersona.toLocaleString('es-CR')}</p>
-                            <button onclick="event.stopPropagation(); eliminarV('${documento.id}')" class="text-slate-300 hover:text-red-500 text-xl">×</button>
-                        </div>
-                    </summary>
-                    <div class="px-4 pb-4 pt-2 bg-slate-50 border-t border-slate-100">
-                        <p class="text-[9px] font-bold text-slate-400 uppercase mb-2">Desglose por día:</p>
-                        <div class="grid grid-cols-1 gap-1">
-                            ${(d.historial || []).map(h => `
-                                <div class="flex justify-between text-[11px] bg-white p-2 rounded border border-slate-200">
-                                    <span class="text-slate-500">${h.fecha}</span>
-                                    <span class="font-bold text-slate-800">+${h.cant} horas</span>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>`;
-                lista.appendChild(item);
+            snap.forEach(docSnap => {
+                const d = docSnap.data();
+                const precio = obtenerPrecio(d.empleado);
+                const subtotal = d.horas * precio;
+                totalGeneral += subtotal;
+
+                const card = document.createElement('div');
+                card.className = "flex justify-between items-center p-4 bg-slate-50 border border-slate-200 rounded-xl";
+                card.innerHTML = `
+                    <div class="flex-1">
+                        <p class="font-black text-slate-800 text-sm tracking-tight">${d.empleado}</p>
+                        <p class="text-[11px] font-bold text-blue-600">${d.horas} HORAS TOTALES (@ ₡${precio})</p>
+                    </div>
+                    <div class="text-right flex items-center gap-3">
+                        <p class="text-lg font-mono font-black text-green-600">₡${subtotal.toLocaleString('es-CR')}</p>
+                        <button onclick="eliminarV('${docSnap.id}')" class="text-slate-300 hover:text-red-500 font-bold px-2 text-xl">×</button>
+                    </div>
+                `;
+                lista.appendChild(card);
             });
+
             document.getElementById('totalGlobalV').classList.remove('hidden');
-            document.getElementById('montoGlobalV').innerText = "₡" + globalSuma.toLocaleString('es-CR');
+            document.getElementById('montoGlobalV').innerText = "₡" + totalGeneral.toLocaleString('es-CR');
         }
 
         document.getElementById('btnLimpiarV').onclick = async () => {
-            if(confirm("¿Borrar toda la semana de verdulería?")) {
+            if(confirm("¿Deseas borrar TODOS los nombres de la semana?")) {
                 const q = query(collection(db, "jornadas"), where("tipo", "==", "verduleria"));
                 const snap = await getDocs(q);
-                const batch = writeBatch(db); snap.forEach(d => batch.delete(d.ref)); await batch.commit(); cargarV();
+                const batch = writeBatch(db);
+                snap.forEach(d => batch.delete(d.ref));
+                await batch.commit();
+                cargarV();
             }
         };
 
