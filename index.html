@@ -1,178 +1,285 @@
 <!DOCTYPE html>
+
 <html lang="es">
+
 <head>
+
     <meta charset="UTF-8">
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Verdulería - Control Semanal</title>
+
+    <title>Planilla de Horas</title>
+
     <script src="https://cdn.tailwindcss.com"></script>
+
     <style>
+
         summary { cursor: pointer; list-style: none; }
+
         summary::-webkit-details-marker { display: none; }
+
     </style>
+
 </head>
+
 <body class="bg-slate-100 p-4 font-sans text-slate-900">
+
     <div class="max-w-xl mx-auto space-y-6">
-        <div class="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
-            <a href="index.html" class="text-blue-600 font-bold text-sm">← Volver</a>
-            <h1 class="text-xl font-black text-blue-600 tracking-tight text-center uppercase">Verdulería</h1>
+
+        <div class="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm">
+
+            <h1 class="text-xl font-black text-blue-600 tracking-tight">PLANILLA HORAS</h1>
+
+            <div class="flex gap-2">
+
+                <a href="cosecha.html" class="bg-blue-50 text-blue-700 font-bold text-[10px] px-3 py-2 rounded-lg">Cosecha</a>
+
+                <a href="verduleria.html" class="bg-blue-50 text-blue-700 font-bold text-[10px] px-3 py-2 rounded-lg">Verduleria</a>
+
+            </div>
+
         </div>
 
+
+
         <div class="bg-white p-6 rounded-2xl shadow-md border border-slate-200">
-            <form id="verduleriaForm" class="space-y-4">
-                <div>
-                    <label class="text-[10px] font-bold text-slate-400 uppercase ml-2 tracking-widest">Nombre Personal</label>
-                    <input type="text" id="nombreV" class="w-full border-2 border-slate-100 p-3 rounded-xl uppercase outline-none focus:border-blue-400" placeholder="NOMBRE COMPLETO" required>
+
+            <form id="registroForm" class="space-y-4">
+
+                <input type="text" id="nombreEmpleado" class="w-full border-2 border-slate-100 p-3 rounded-xl uppercase outline-none focus:border-blue-400" placeholder="Nombre Empleado" required>
+
+                <div class="grid grid-cols-2 gap-4">
+
+                    <div>
+
+                        <label class="text-[10px] font-bold text-gray-400 uppercase ml-2">Normales (₡1.600)</label>
+
+                        <input type="number" id="horas" step="0.5" class="w-full border-2 border-slate-100 p-3 rounded-xl outline-none" placeholder="0">
+
+                    </div>
+
+                    <div>
+
+                        <label class="text-[10px] font-bold text-gray-400 uppercase ml-2">Extras (₡2.000)</label>
+
+                        <input type="number" id="horasExtra" step="0.5" class="w-full border-2 border-slate-100 p-3 rounded-xl outline-none" placeholder="0">
+
+                    </div>
+
                 </div>
-                <div>
-                    <label class="text-[10px] font-bold text-slate-400 uppercase ml-2 tracking-widest">Horas a sumar</label>
-                    <input type="number" id="horasV" step="0.5" class="w-full border-2 border-slate-100 p-3 rounded-xl outline-none" placeholder="0.0" required>
-                </div>
-                <button type="submit" id="btnV" class="w-full bg-blue-600 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-blue-700 transition">
-                    SUMAR AL REGISTRO
-                </button>
+
+                <button type="submit" id="btnGuardar" class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-blue-700 transition">Guardar Registro</button>
+
             </form>
+
         </div>
+
+
 
         <div class="bg-white p-6 rounded-2xl shadow-md border border-slate-200">
-            <div class="flex justify-between items-center mb-4 border-b pb-2">
-                <h2 class="text-lg font-bold text-slate-700">Totales Semanales</h2>
-                <button id="btnLimpiarV" class="text-[10px] bg-red-50 text-red-500 px-3 py-1 rounded-full font-bold border border-red-100 uppercase">Reiniciar</button>
-            </div>
-            
-            <div id="contenedorV" class="space-y-4">
-                <p class="text-center text-slate-400 text-sm italic">Cargando...</p>
+
+            <div class="flex justify-between items-center mb-6">
+
+                <h2 class="text-lg font-bold text-slate-800">Cuentas Semanales</h2>
+
+                <button id="btnBorrarHoras" class="text-[10px] bg-red-50 text-red-500 px-3 py-1 rounded-full font-bold border border-red-100 uppercase">Reiniciar</button>
+
             </div>
 
-            <div id="totalGlobalV" class="mt-6 p-4 bg-blue-600 rounded-xl text-white text-center shadow-lg hidden">
-                <p class="text-[10px] uppercase font-bold opacity-80 tracking-widest">Total Planilla Verdulería</p>
-                <p id="montoGlobalV" class="text-2xl font-black font-mono">₡0</p>
+            <div id="contenedorCuentas" class="space-y-4"></div>
+
+            <div id="totalGlobalPlanilla" class="mt-6 p-4 bg-blue-600 rounded-xl text-white text-center shadow-lg hidden">
+
+                <p class="text-[10px] uppercase font-bold opacity-80 tracking-widest">Total Global a Pagar</p>
+
+                <p id="montoGlobalPlanilla" class="text-2xl font-black font-mono">₡0</p>
+
             </div>
+
         </div>
+
     </div>
 
+
+
     <script type="module">
+
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, collection, query, where, getDocs, addDoc, updateDoc, doc, writeBatch, orderBy, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        import { getFirestore, collection, query, where, getDocs, addDoc, updateDoc, doc, writeBatch, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+
 
         const firebaseConfig = {
+
             apiKey: "AIzaSyDyMOLpJEBba4cS6IKMXhQthHjx-e4A8_c",
+
             authDomain: "maii-57e2e.firebaseapp.com",
+
             projectId: "maii-57e2e",
+
             storageBucket: "maii-57e2e.firebasestorage.app",
+
             messagingSenderId: "206886816498",
+
             appId: "1:206886816498:web:93b853d5924e3789b51e6b"
+
         };
+
+
 
         const app = initializeApp(firebaseConfig);
+
         const db = getFirestore(app);
 
-        // REGLA DE PRECIO: Angie 1400, los demás 1600
-        const obtenerPrecio = (nombre) => nombre.includes("ANGIE") ? 1400 : 1600;
+        const PRECIO_NORMAL = 1600;
 
-        document.getElementById('verduleriaForm').onsubmit = async (e) => {
+        const PRECIO_EXTRA = 2000;
+
+
+
+        document.getElementById('registroForm').onsubmit = async (e) => {
+
             e.preventDefault();
-            const btn = document.getElementById('btnV');
+
+            const btn = document.getElementById('btnGuardar');
+
             btn.disabled = true; btn.innerText = "Guardando...";
-            
-            const hoy = new Date().toLocaleDateString('es-CR');
-            const nombre = document.getElementById('nombreV').value.trim().toUpperCase();
-            const horas = parseFloat(document.getElementById('horasV').value) || 0;
+
+            const hoy = new Date().toISOString().split('T')[0];
+
+            const nombre = document.getElementById('nombreEmpleado').value.trim().toUpperCase();
+
+            const hN = parseFloat(document.getElementById('horas').value) || 0;
+
+            const hE = parseFloat(document.getElementById('horasExtra').value) || 0;
 
             try {
-                // Guardamos cada entrada por separado para mantener el historial por fecha
-                await addDoc(collection(db, "jornadas"), { 
-                    tipo: 'verduleria', 
-                    empleado: nombre, 
-                    fecha: hoy, 
-                    horas: horas, 
-                    createdAt: new Date() 
-                });
-                
-                e.target.reset(); 
-                await cargarV();
-            } catch (err) { alert("Error"); } finally { btn.disabled = false; btn.innerText = "SUMAR AL REGISTRO"; }
+
+                const q = query(collection(db, "jornadas"), where("empleado", "==", nombre), where("fecha", "==", hoy), where("tipo", "==", "hora"));
+
+                const snap = await getDocs(q);
+
+                if (!snap.empty) {
+
+                    const docId = snap.docs[0].id;
+
+                    const data = snap.docs[0].data();
+
+                    await updateDoc(doc(db, "jornadas", docId), { hN: (data.hN || 0) + hN, hE: (data.hE || 0) + hE });
+
+                } else {
+
+                    await addDoc(collection(db, "jornadas"), { tipo: 'hora', empleado: nombre, fecha: hoy, hN, hE, createdAt: new Date() });
+
+                }
+
+                e.target.reset(); await cargarDatos();
+
+            } catch (err) { alert("Error"); } finally { btn.disabled = false; btn.innerText = "Guardar Registro"; }
+
         };
 
-        async function cargarV() {
-            const lista = document.getElementById('contenedorV');
-            const q = query(collection(db, "jornadas"), where("tipo", "==", "verduleria"));
-            const snap = await getDocs(q);
-            
-            let resumen = {}; 
-            let globalSuma = 0;
 
-            // Agrupamos todos los registros por nombre
-            snap.forEach(documento => {
-                const d = documento.data();
-                if(!resumen[d.empleado]) resumen[d.empleado] = { horasTotales: 0, historial: [] };
-                resumen[d.empleado].horasTotales += (parseFloat(d.horas) || 0);
-                resumen[d.empleado].historial.push({ ...d, id: documento.id });
+
+        async function cargarDatos() {
+
+            const contenedor = document.getElementById('contenedorCuentas');
+
+            const q = query(collection(db, "jornadas"), where("tipo", "==", "hora"));
+
+            const snapshot = await getDocs(q);
+
+            let resumen = {}; let globalTotal = 0;
+
+            snapshot.forEach(doc => {
+
+                const d = doc.data();
+
+                if(!resumen[d.empleado]) resumen[d.empleado] = { hN: 0, hE: 0, historial: [] };
+
+                resumen[d.empleado].hN += (parseFloat(d.hN) || 0);
+
+                resumen[d.empleado].hE += (parseFloat(d.hE) || 0);
+
+                resumen[d.empleado].historial.push(d);
+
             });
 
-            lista.innerHTML = "";
+            contenedor.innerHTML = "";
+
             const nombres = Object.keys(resumen);
 
             if (nombres.length === 0) {
-                document.getElementById('totalGlobalV').classList.add('hidden');
-                lista.innerHTML = "<p class='text-center text-slate-400 text-sm italic'>Sin registros.</p>";
+
+                document.getElementById('totalGlobalPlanilla').classList.add('hidden');
+
+                contenedor.innerHTML = "<p class='text-center text-slate-400 text-sm italic'>Sin registros.</p>";
+
                 return;
+
             }
 
             nombres.forEach(nombre => {
+
                 const info = resumen[nombre];
-                const precio = obtenerPrecio(nombre);
-                const totalPersona = info.horasTotales * precio;
-                globalSuma += totalPersona;
+
+                const total = (info.hN * PRECIO_NORMAL) + (info.hE * PRECIO_EXTRA);
+
+                globalTotal += total;
 
                 const item = document.createElement('details');
+
                 item.className = "group border-2 border-slate-50 rounded-2xl bg-white shadow-sm overflow-hidden mb-3";
+
                 item.innerHTML = `
+
                     <summary class="p-4 flex justify-between items-center hover:bg-slate-50 transition">
-                        <div>
-                            <p class="text-sm font-bold uppercase text-slate-700">${nombre} ▾</p>
-                            <p class="text-[10px] text-blue-600 font-bold">${info.horasTotales}h totales (@ ₡${precio})</p>
-                        </div>
-                        <div class="text-right">
-                            <p class="text-lg font-black text-green-600 font-mono leading-none">₡${totalPersona.toLocaleString('es-CR')}</p>
-                        </div>
+
+                        <div><p class="text-sm font-bold uppercase text-slate-700">${nombre} ▾</p></div>
+
+                        <div class="text-right"><p class="text-lg font-black text-blue-600 font-mono">₡${total.toLocaleString('es-CR')}</p></div>
+
                     </summary>
+
                     <div class="p-4 bg-slate-50 border-t border-slate-100 space-y-1">
-                        ${info.historial.map(h => `
-                            <div class="flex justify-between items-center text-[11px] p-2 bg-white rounded-lg border border-slate-100">
-                                <span>${h.fecha}</span>
-                                <div class="flex items-center gap-3">
-                                    <span class="font-bold">+${h.horas}h</span>
-                                    <button onclick="eliminarEntrada('${h.id}')" class="text-red-300 hover:text-red-600">✕</button>
-                                </div>
-                            </div>
-                        `).join('')}
+
+                        ${info.historial.map(h => `<div class="flex justify-between text-[11px] p-2 bg-white rounded-lg border border-slate-100"><span>${h.fecha}</span><span>${h.hN}n + ${h.hE}x</span></div>`).join('')}
+
                     </div>`;
-                lista.appendChild(item);
+
+                contenedor.appendChild(item);
+
             });
 
-            document.getElementById('totalGlobalV').classList.remove('hidden');
-            document.getElementById('montoGlobalV').innerText = "₡" + globalSuma.toLocaleString('es-CR');
+            document.getElementById('totalGlobalPlanilla').classList.remove('hidden');
+
+            document.getElementById('montoGlobalPlanilla').innerText = "₡" + globalTotal.toLocaleString('es-CR');
+
         }
 
-        window.eliminarEntrada = async (id) => {
-            if(confirm("¿Eliminar este registro de hora?")) {
-                await deleteDoc(doc(db, "jornadas", id));
-                cargarV();
-            }
-        };
+        document.getElementById('btnBorrarHoras').onclick = async () => {
 
-        document.getElementById('btnLimpiarV').onclick = async () => {
-            if(confirm("¿Borrar toda la planilla de Verdulería?")) {
-                const q = query(collection(db, "jornadas"), where("tipo", "==", "verduleria"));
+            if(confirm("¿Borrar planilla?")) {
+
+                const q = query(collection(db, "jornadas"), where("tipo", "==", "hora"));
+
                 const snap = await getDocs(q);
+
                 const batch = writeBatch(db);
+
                 snap.forEach(d => batch.delete(d.ref));
-                await batch.commit(); 
-                cargarV();
+
+                await batch.commit(); cargarDatos();
+
             }
+
         };
 
-        cargarV();
+        cargarDatos();
+
     </script>
+
 </body>
+
 </html>
